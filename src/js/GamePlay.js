@@ -72,20 +72,18 @@ export default class GamePlay {
     for (const cell of this.cells) {
       cell.innerHTML = '';
     }
-
     for (const position of positions) {
       const cellEl = this.boardEl.children[position.position];
       const charEl = document.createElement('div');
-      charEl.classList.add('character', position.character.type);
+      charEl.classList.add('character', position.character._type);
 
       const healthEl = document.createElement('div');
       healthEl.classList.add('health-level');
 
       const healthIndicatorEl = document.createElement('div');
-      healthIndicatorEl.classList.add('health-level-indicator', `health-level-indicator-${calcHealthLevel(position.character.health)}`);
-      healthIndicatorEl.style.width = `${position.character.health}%`;
+      healthIndicatorEl.classList.add('health-level-indicator', `health-level-indicator-${calcHealthLevel(position.character._health)}`);
+      healthIndicatorEl.style.width = `${position.character._health}%`;
       healthEl.appendChild(healthIndicatorEl);
-
       charEl.appendChild(healthEl);
       cellEl.appendChild(charEl);
     }
@@ -192,8 +190,7 @@ export default class GamePlay {
 
   deselectCell(index) {
     const cell = this.cells[index];
-    cell.classList.remove(...Array.from(cell.classList)
-      .filter((o) => o.startsWith('selected')));
+    cell.classList.remove(...Array.from(cell.classList).filter((o) => o.startsWith('selected')));
   }
 
   showCellTooltip(message, index) {

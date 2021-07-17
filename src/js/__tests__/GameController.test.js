@@ -19,7 +19,7 @@ it('Метод getDistanceCharacter() должен возвращать корр
   const gameCtrl = new GameController(gamePlay, stateService);
   gameCtrl.humanTeam = [new PositionedCharacter(new Bowman(1), 1)];
   gameCtrl.selectedCharacter = gameCtrl.humanTeam.find((elem) => elem.position === 1);
-  expect(gameCtrl.getDistanceCharacter()).toEqual([
+  expect(gameCtrl.getDistanceCharacter(gameCtrl.selectedCharacter)).toEqual([
     1, 2, 3, 10, 19,
     9, 17, 8, 0,
   ]);

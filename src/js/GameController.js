@@ -1,10 +1,11 @@
 import themes from './themes';
-import { generateTeam, getRandomHumanPosition } from './generators';
+import generateTeam from './functions/generators';
+import getRandomHumanPosition from './functions/getRandomHumanPosition';
 import Team from './Team';
 import GamePlay from './GamePlay';
 import GameState from './GameState';
 import PositionedCharacter from './PositionedCharacter';
-import Character from './Character';
+import Character from './characters/Character';
 
 export default class GameController {
   constructor(gamePlay, stateService) {
@@ -18,92 +19,6 @@ export default class GameController {
     this.level = themes.prairie;
     this.playerPoints = 0;
     this.gameState = GameState.from(this);
-  }
-
-  // Сохранение состояния в сессию
-  saveInSession() {
-    this.gameState = GameState.from(this);
-    sessionStorage.setItem('game', JSON.stringify(this.gameState));
-  }
-
-  // Подготовка игры
-  preparationGame() {
-    const heroesTeam = GameController.getRandomCharacter([this.teams.humansRepository[0], this.teams.humansRepository[1]]);
-    const daemonsTeam = this.teams.demonsRepository.reduce((arr, character) => {
-      arr.push(character);
-      return GameController.getRandomCharacter(arr);
-    }, []);
-
-    generateTeam(heroesTeam, 1, 2).reduce((arr, character) => {
-      arr.push(character);
-      return arr;
-    }, this.humanTeam);
-
-    generateTeam(daemonsTeam, 2, 2).reduce((arr, character) => {
-      arr.push(character);
-      return arr;
-    }, this.demonTeam);
-
-    this.saveInSession();
-  }
-
-  // Подготовка к следующему уровню
-  preparationNextLevelUp() {
-    const heroesTeam = this.teams.humansRepository.reduce((arr, character) => {
-      arr.push(character);
-      return GameController.getRandomCharacter(arr);
-    }, []);
-
-    let countCharacter = 2;
-    let maxLevelForNewHumanCharacter = 1;
-    let maxLevelForNewDemonCharacter = 2;
-
-    if (this.level === 'desert') countCharacter = 1;
-
-    if (this.level === 'arctic') {
-      countCharacter = 2;
-      maxLevelForNewHumanCharacter = 2;
-      maxLevelForNewDemonCharacter = 3;
-    }
-
-    if (this.level === 'mountain') {
-      countCharacter = 2;
-      maxLevelForNewHumanCharacter = 3;
-      maxLevelForNewDemonCharacter = 4;
-    }
-
-    generateTeam(heroesTeam, maxLevelForNewHumanCharacter, countCharacter).reduce((arr, character) => {
-      arr.push(character);
-      return arr;
-    }, this.humanTeam);
-
-    // Переопределение позиций людей на следующий уровень
-    const randomHumanPosition = getRandomHumanPosition();
-    this.humanTeam.forEach((character) => {
-      const person = character;
-      person.position = randomHumanPosition.next().value;
-    });
-
-    let demonsTeam = null;
-
-    const arr = [];
-    for (let i = 0; i < this.humanTeam.length; i += 1) {
-      arr.push(this.teams.demonsRepository[Math.trunc(Math.random() * this.teams.demonsRepository.length)]);
-    }
-    demonsTeam = arr;
-
-    generateTeam(GameController.getRandomCharacter(demonsTeam), maxLevelForNewDemonCharacter, this.humanTeam.length).reduce((array, character) => {
-      array.push(character);
-      return array;
-    }, this.demonTeam);
-
-    this.saveInSession();
-  }
-
-  // Получение состояния игры из сессии
-  getSessionStorage() {
-    const loadObject = JSON.parse(sessionStorage.getItem('game'));
-    this.transformStateObject(loadObject);
   }
 
   // Начало игры
@@ -126,15 +41,66 @@ export default class GameController {
     this.gamePlay.addLoadGameListener(this.onLoadGameClick.bind(this));
   }
 
+  // Сохранение состояния в сессию
+  saveInSession() {
+    this.gameState = GameState.from(this);
+    sessionStorage.setItem('game', JSON.stringify(this.gameState));
+  }
+
+  // Подготовка игры
+  preparationGame() {
+    this.humanTeam = generateTeam([this.teams.humansRepository[0], this.teams.humansRepository[1]], 1, 2);
+    this.demonTeam = generateTeam(this.teams.demonsRepository, 2, 2);
+    this.saveInSession();
+  }
+
+  // Подготовка к следующему уровню
+  preparationNextLevelUp() {
+    let countCharacter = 2;
+    let maxLevelForNewHumanCharacter = 1;
+    let maxLevelForNewDemonCharacter = 2;
+
+    if (this.level === 'desert') countCharacter = 1;
+    if (this.level === 'arctic') {
+      countCharacter = 2;
+      maxLevelForNewHumanCharacter = 2;
+      maxLevelForNewDemonCharacter = 3;
+    }
+    if (this.level === 'mountain') {
+      countCharacter = 2;
+      maxLevelForNewHumanCharacter = 3;
+      maxLevelForNewDemonCharacter = 4;
+    }
+    const humanTeam = generateTeam(this.teams.humansRepository, maxLevelForNewHumanCharacter, countCharacter).map((character) => character);
+    const arrayRandomHumanPositions = getRandomHumanPosition()[Symbol.iterator]();
+    this.humanTeam = [...this.humanTeam, ...humanTeam];
+    this.humanTeam.forEach((character) => {
+      const person = character;
+      person.position = arrayRandomHumanPositions.next().value;
+    });
+
+    this.demonTeam = generateTeam(this.teams.demonsRepository, maxLevelForNewDemonCharacter, this.humanTeam.length);
+
+    this.move = this.humanTeam;
+
+    this.saveInSession();
+  }
+
+  // Получение состояния игры из сессии
+  getSessionStorage() {
+    const loadObject = JSON.parse(sessionStorage.getItem('game'));
+    this.transformStateObject(loadObject);
+  }
+
   // Начало новой игры
   onNewGameClick() {
     this.humanTeam = [];
     this.demonTeam = [];
-    this.move = this.humanTeam;
     this.level = themes.prairie;
     this.preparationGame();
     this.gamePlay.drawUi(this.level);
     this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+    this.move = this.humanTeam;
   }
 
   // Сохранение игры
@@ -153,128 +119,123 @@ export default class GameController {
     this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
   }
 
-  onCellClick(index) {
+  async onCellClick(index) {
     // TODO: react to click
-
-    // Ход персонажей
     if (!(this.selectedCharacter)) {
       if (!(this.gamePlay.cells[index].hasChildNodes())) return;
-      if (!(this.checkCurrentCharacter(index))
+      if (!(GameController.checkCurrentCharacter(this.gamePlay.cells[index].firstChild.classList[1]))
         && this.gamePlay.cells[index].hasChildNodes()
         && !(this.gamePlay.cells[index].classList.contains('selected-green'))
         && !(this.gamePlay.cells[index].classList.contains('selected-red'))) {
         GamePlay.showError('Нельзя выбрать игрока противоположной команды!');
+        return;
       }
     }
 
+    // Ход персонажей
     if (this.selectedCharacter && this.gamePlay.cells[index].classList.contains('selected-green')) {
+      this.gamePlay.deselectCell(this.selectedCharacter.position);
+      this.gamePlay.deselectCell(index);
       this.selectedCharacter.position = index;
       this.saveInSession();
       this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
-      if (this.move === this.humanTeam) {
-        this.moveDemonsTeam().then((result) => result);
-        this.checkAndDeleteSelectedCharacter();
-      } else {
-        this.move = this.humanTeam;
-        this.checkAndDeleteSelectedCharacter();
-      }
+      await this.moveDemonsTeam();
+      this.move = this.humanTeam;
+      return;
     }
 
     // Атака персонажей
     if (this.selectedCharacter && this.gamePlay.cells[index].classList.contains('selected-red')) {
-      const attacker = this.selectedCharacter.character;
-      const target = (this.move === this.humanTeam)
-        ? this.demonTeam.find((character) => character.position === index)
-        : this.humanTeam.find((character) => character.position === index);
-      const damage = Math.round(Math.max(attacker._attack - target.character._defence, attacker._attack * 0.1));
-      this.gamePlay.showDamage(index, damage).then((result) => {
-        target.character.health -= damage;
-        this.checkAndDeleteSelectedCharacter();
-        this.saveInSession();
-        this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
-        if (target.character.health <= 0) {
-          const teamEnemy = (this.move === this.humanTeam) ? this.demonTeam : this.humanTeam;
-          teamEnemy.forEach((character, count) => {
-            if (character === target) teamEnemy.splice(count, 1);
-          });
-        }
-
-        this.saveInSession();
-        this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
-
-        if (this.humanTeam.length === 0) {
-          GamePlay.showMessage('Вы проиграли!');
+      this.gamePlay.deselectCell(index);
+      this.gamePlay.deselectCell(this.selectedCharacter.position);
+      await this.attackPerson(index);
+      this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+      if (this.demonTeam.length === 0) {
+        if (this.level === 'mountain') {
+          GamePlay.showMessage('Вы выйграли игру!');
           return;
         }
-
-        if (this.demonTeam.length === 0) {
-          this.move = this.humanTeam;
-          this.winAndLevelUpGame();
-          return;
-        }
-
-        if (this.move === this.humanTeam) {
-          this.moveDemonsTeam().then((move) => move);
-        } else {
-          this.move = this.humanTeam;
-        }
-        // eslint-disable-next-line consistent-return
-        return result;
-      });
+        this.winAndLevelUpGame();
+      }
+      this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+      await this.moveDemonsTeam();
+      this.gamePlay.deselectCell(index);
+      this.move = this.humanTeam;
+      return;
     }
 
     // Выбор персонажа
-    if (this.selectedCharacter && this.gamePlay.cells[index].hasChildNodes() && this.checkCurrentCharacter(index)) {
-      this.checkAndDeleteSelectedCharacter();
+    if (this.selectedCharacter
+      && this.gamePlay.cells[index].hasChildNodes()
+      && (GameController.checkCurrentCharacter(this.gamePlay.cells[index].firstChild.classList[1]))) {
+      this.gamePlay.deselectCell(this.selectedCharacter.position);
       this.gamePlay.selectCell(index);
       this.selectedCharacter = this.move.find((elem) => elem.position === index);
+      return;
     }
 
-    if (!(this.selectedCharacter) && this.gamePlay.cells[index].hasChildNodes() && this.checkCurrentCharacter(index)) {
+    if (!this.selectedCharacter
+      && this.gamePlay.cells[index].hasChildNodes()
+      && (GameController.checkCurrentCharacter(this.gamePlay.cells[index].firstChild.classList[1]))) {
       this.gamePlay.selectCell(index);
       this.selectedCharacter = this.move.find((elem) => elem.position === index);
     }
   }
 
   // Ход персонажа команды демонов
-  moveDemonsTeam() {
-    return new Promise((resolve) => {
-      this.move = this.demonTeam;
-      this.selectedCharacter = this.demonTeam[Math.trunc(Math.random() * this.demonTeam.length)];
-      const movesAttack = this.getAttackCharacter();
-      const move = this.getDistanceCharacter();
-      const variantsAttack = movesAttack.reduce((arr, cell) => {
-        if (this.gamePlay.cells[cell].hasChildNodes() && !(this.checkCurrentCharacter(cell))) {
-          arr.push(cell);
-        }
-        return arr;
-      }, []);
-      const variantMoves = move.reduce((arr, cell) => {
-        if (!this.gamePlay.cells[cell].hasChildNodes()) {
-          arr.push(cell);
-        }
-        return arr;
-      }, []);
-      const event = new Event('click');
-      if (variantsAttack.length > 0) {
-        const randomIndex = variantsAttack[Math.trunc(Math.random() * variantsAttack.length)];
-        this.gamePlay.selectCell(randomIndex, 'red');
-        this.gamePlay.cells[randomIndex].dispatchEvent(event);
-        this.gamePlay.cells[randomIndex].classList.remove('selected-red');
-      } else {
-        const randomIndex = variantMoves[Math.trunc(Math.random() * variantMoves.length)];
-        this.gamePlay.selectCell(randomIndex, 'green');
-        this.gamePlay.cells[randomIndex].dispatchEvent(event);
-        this.gamePlay.cells[randomIndex].classList.remove('selected-green');
-        this.checkAndDeleteSelectedCharacter();
+  async moveDemonsTeam() {
+    this.move = this.demonTeam;
+    const accessAttackPerson = this.demonTeam.reduce((arr, person) => {
+      const accessAttack = this.getAttackCharacter(person)
+        .filter((elem) => this.gamePlay.cells[Number(elem)].hasChildNodes())
+        .filter((element) => (GameController.checkCurrentCharacter(this.gamePlay.cells[element].firstChild.classList[1])));
+      if (accessAttack.length > 0) {
+        arr.push({ person, accessAttack });
       }
-      resolve();
-    });
+      return arr;
+    }, []);
+    if (accessAttackPerson.length > 0) {
+      if (accessAttackPerson.length < 2) {
+        this.selectedCharacter = accessAttackPerson[0].person;
+        const cellIndex = this.selectedCharacter.position;
+        this.gamePlay.selectCell(cellIndex);
+        this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+        const randomIndex = accessAttackPerson[0].accessAttack[Math.round(Math.random() * (accessAttackPerson[0].accessAttack.length - 1))];
+        await this.attackPerson(randomIndex);
+        if (this.humanTeam.length === 0) {
+          GamePlay.showMessage('Вы проиграли!');
+        }
+        this.gamePlay.deselectCell(cellIndex);
+        this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+        return;
+      }
+      const index = Math.round(Math.random() * (accessAttackPerson.length - 1));
+      this.selectedCharacter = accessAttackPerson[index].person;
+      const cellIndex = this.selectedCharacter.position;
+      this.gamePlay.selectCell(cellIndex);
+      this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+      const indexAttack = accessAttackPerson[index].accessAttack[Math.round(Math.random() * (accessAttackPerson[index].accessAttack.length - 1))];
+      await this.attackPerson(indexAttack);
+      if (this.humanTeam.length === 0) {
+        GamePlay.showMessage('Вы проиграли!');
+      }
+      this.gamePlay.deselectCell(cellIndex);
+      this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+      return;
+    }
+    this.selectedCharacter = this.demonTeam[Math.round(Math.random() * (this.demonTeam.length - 1))];
+    const moves = this.getDistanceCharacter(this.selectedCharacter).filter((elem) => !this.gamePlay.cells[elem].hasChildNodes());
+    this.selectedCharacter.position = moves[Math.round(Math.random() * (moves.length - 1))];
+    this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
+    this.selectedCharacter = null;
+    this.move = this.humanTeam;
   }
 
   onCellEnter(index) {
     // TODO: react to mouse enter
     this.gamePlay.setCursor('');
+
+    if (this.move === this.demonTeam) return;
 
     this.gamePlay.cells.forEach((elem, count) => {
       const cellEnter = [...elem.classList].filter((className) => className === 'selected');
@@ -295,7 +256,7 @@ export default class GameController {
     }
 
     if (this.selectedCharacter && !(this.gamePlay.cells[index].hasChildNodes())) {
-      if (this.getDistanceCharacter().includes(index)) {
+      if (this.getDistanceCharacter(this.selectedCharacter).includes(index)) {
         this.gamePlay.setCursor('pointer');
         this.gamePlay.selectCell(index, 'green');
       } else {
@@ -304,8 +265,8 @@ export default class GameController {
     }
 
     if (this.selectedCharacter && (this.gamePlay.cells[index].hasChildNodes())) {
-      if (!(this.checkCurrentCharacter(index))) {
-        if (this.getAttackCharacter().includes(index)) {
+      if (!GameController.checkCurrentCharacter(this.gamePlay.cells[index].firstChild.classList[1])) {
+        if (this.getAttackCharacter(this.selectedCharacter).includes(index)) {
           this.gamePlay.setCursor('crosshair');
           this.gamePlay.selectCell(index, 'red');
         } else {
@@ -324,12 +285,34 @@ export default class GameController {
     }
   }
 
+  attackPerson(index) {
+    return new Promise((resolve) => {
+      const attacker = this.selectedCharacter.character;
+      const target = (this.move === this.humanTeam)
+        ? this.demonTeam.find((character) => character.position === index)
+        : this.humanTeam.find((character) => character.position === index);
+      const random = Math.round(Math.random() * 3);
+      const damage = (random === 3)
+        ? Math.round(Math.max(attacker._attack - target.character._defence, attacker._attack * 0.1)
+          + (Math.round(Math.max(attacker._attack - target.character._defence, attacker._attack * 0.1)) * 0.75))
+        : Math.round(Math.max(attacker._attack - target.character._defence, attacker._attack * 0.1));
+      target.character._health -= damage;
+      this.gamePlay.showDamage(index, damage).then(() => {
+        if (target.character._health <= 0) {
+          const teamEnemy = (this.move === this.humanTeam) ? this.demonTeam : this.humanTeam;
+          teamEnemy.forEach((character, count) => {
+            if (character === target) teamEnemy.splice(count, 1);
+          });
+        }
+        this.saveInSession();
+        this.selectedCharacter = null;
+        resolve();
+      });
+    });
+  }
+
   // Логика перехода на следующий уровень
   winAndLevelUpGame() {
-    if (this.level === 'mountain') {
-      GamePlay.showMessage('Вы выйграли игру!');
-      return;
-    }
     GamePlay.showMessage('Вы выйграли! Переход на следующий уровень');
 
     this.playerPoints += [...this.humanTeam].reduce((sum, character) => sum + character.character.health, 0);
@@ -346,40 +329,24 @@ export default class GameController {
     this.gamePlay.redrawPositions([...this.humanTeam, ...this.demonTeam]);
   }
 
-  // Получение случайного персонажа из массива персонажей
-  static getRandomCharacter(arrayCharacters) {
-    const arr = [];
-    for (let i = 0; i < arrayCharacters.length; i += 1) {
-      arr.push(arrayCharacters[Math.trunc(Math.random() * arrayCharacters.length)]);
-    }
-    return arr;
-  }
-
   // Получение дистанции возможных ходов персонажа
-  getDistanceCharacter() {
-    const top = [];
-    const diagonalTopRight = [];
-    const right = [];
-    const diagonalDownRight = [];
-    const down = [];
-    const diagonalDownLeft = [];
-    const left = [];
-    const diagonalLeftTop = [];
+  getDistanceCharacter(character) {
+    const variantDistance = this.gamePlay.cells.reduce((arr, cell, index) => {
+      if (index < character.character._distance + 1) {
+        const [row, coll] = this.convertTo2DCoords(character.position);
+        arr.push([row - index, coll]);
+        arr.push([row - index, coll + index]);
+        arr.push([row, coll + index]);
+        arr.push([row + index, coll + index]);
+        arr.push([row + index, coll]);
+        arr.push([row + index, coll - index]);
+        arr.push([row, coll - index]);
+        arr.push([row - index, coll - index]);
+      }
+      return arr;
+    }, []);
 
-    for (let i = 0; i < this.selectedCharacter.character.distance + 1; i += 1) {
-      const [row, coll] = this.convertTo2DCoords(this.selectedCharacter.position);
-      top.push([row - i, coll]);
-      diagonalTopRight.push([row - i, coll + i]);
-      right.push([row, coll + i]);
-      diagonalDownRight.push([row + i, coll + i]);
-      down.push([row + i, coll]);
-      diagonalDownLeft.push([row + i, coll - i]);
-      left.push([row, coll - i]);
-      diagonalLeftTop.push([row - i, coll - i]);
-    }
-    return [...this.convertFrom2DToCoords([...top, ...diagonalTopRight, ...right,
-      ...diagonalDownRight, ...down, ...diagonalDownLeft, ...left, ...diagonalLeftTop])
-      .values()];
+    return [...this.convertFrom2DToCoords(variantDistance)];
   }
 
   // Всплывающая информация о персонажах
@@ -390,35 +357,27 @@ export default class GameController {
     const defenceImage = '\u{1F6E1}';
     const healthImage = '\u{2764}';
     // eslint-disable-next-line max-len
-    return `${medalImage}${person.character.level}  ${attackImage}${person.character.attack}  ${defenceImage}${person.character.defence}  ${healthImage}${person.character.health}`;
+    return `${medalImage}${person.character._level}  ${attackImage}${person.character._attack}  ${defenceImage}${person.character._defence}  ${healthImage}${person.character._health}`;
   }
 
   // Получение дистанции возможных ходов атаки персонажа
-  getAttackCharacter() {
-    const arrayCoords = [];
-    const [row, coll] = this.convertTo2DCoords(this.selectedCharacter.position);
-    for (let i = 0; i < this.selectedCharacter.character.distanceAttack + 1; i += 1) {
-      arrayCoords.push([row + i, coll]);
-      arrayCoords.push([row - i, coll]);
-    }
+  getAttackCharacter(person) {
+    const arrayCoords = this.gamePlay.cells.reduce((arr, cell, index) => {
+      if (index <= person.character._distanceAttack) {
+        const [row, coll] = this.convertTo2DCoords(person.position);
+        arr.push([row + index, coll]);
+        arr.push([row - index, coll]);
+      }
+      return arr;
+    }, []);
     arrayCoords.forEach((elem) => {
       const [y, x] = elem;
-      for (let j = 0; j < this.selectedCharacter.character.distanceAttack + 1; j += 1) {
-        arrayCoords.push([y, x + j]);
-        arrayCoords.push([y, x - j]);
+      for (let i = 0; i <= person.character._distanceAttack; i += 1) {
+        arrayCoords.push([y, x + i]);
+        arrayCoords.push([y, x - i]);
       }
     });
-    return [...this.convertFrom2DToCoords(arrayCoords).values()];
-  }
-
-  // Проверяет и удаляет выбранного персонажа
-  checkAndDeleteSelectedCharacter() {
-    this.gamePlay.cells.forEach((elem, index) => {
-      if ([...elem.classList].filter((className) => className === 'selected')) {
-        this.gamePlay.deselectCell(index);
-        this.selectedCharacter = null;
-      }
-    });
+    return [...this.convertFrom2DToCoords(arrayCoords)];
   }
 
   // Конвертирует поле игры в 2D координаты
@@ -440,9 +399,8 @@ export default class GameController {
   }
 
   // Проверяет принадежит ли выбираемый персонаж к команде, у которой сейчас ход
-  checkCurrentCharacter(index) {
-    const classNames = [...this.gamePlay.cells[index].querySelector('.character').classList];
-    return !!this.move.find((character) => classNames.includes(character.character.type));
+  static checkCurrentCharacter(nameCharacter) {
+    return (['bowman', 'swordsman', 'magician'].includes(nameCharacter));
   }
 
   // Трансформирует объект, полученный из хранилища в состояние игры
@@ -450,10 +408,8 @@ export default class GameController {
     this.humanTeam = loadObject.humanTeam;
     this.demonTeam = loadObject.demonTeam;
     [...this.humanTeam, ...this.demonTeam].forEach((elem) => {
-      // eslint-disable-next-line no-param-reassign,no-proto
-      elem.__proto__ = PositionedCharacter.prototype;
-      // eslint-disable-next-line no-param-reassign,no-proto
-      elem.character.__proto__ = Character.prototype;
+      Object.setPrototypeOf(elem, PositionedCharacter.prototype);
+      Object.setPrototypeOf(elem.character, Character.prototype);
     });
     this.move = this.humanTeam;
     this.level = loadObject.level;

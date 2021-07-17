@@ -1,4 +1,4 @@
-import Character from '../Character';
+import Character from '../characters/Character';
 import Bowman from '../characters/Bowman';
 
 it('Новый экземпляр класса Character должен выбрасывать ошибку. Создавться должны только дочерние классы', () => {
