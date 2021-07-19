@@ -16,8 +16,7 @@ function* characterGenerator(typePerson, maxLevel) {
 
   let humanPositions = getRandomHumanPosition()[Symbol.iterator]();
   let demonPositions = getRandomDemonPosition()[Symbol.iterator]();
-  const character = Employee.create(typePerson.name, Math.floor(Math.random() * maxLevel) + 1);
-
+  const character = Employee.create(typePerson, Math.floor(Math.random() * maxLevel) + 1);
   if (character._type === 'bowman' || character._type === 'swordsman' || character._type === 'magician') {
     if (humanPositions.next().value === undefined) humanPositions = getRandomHumanPosition()[Symbol.iterator]();
     yield new PositionedCharacter(character, Number(humanPositions.next().value));

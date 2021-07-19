@@ -315,7 +315,7 @@ export default class GameController {
   winAndLevelUpGame() {
     GamePlay.showMessage('Вы выйграли! Переход на следующий уровень');
 
-    this.playerPoints += [...this.humanTeam].reduce((sum, character) => sum + character.character.health, 0);
+    this.playerPoints += [...this.humanTeam].reduce((sum, character) => sum + character.character._health, 0);
     let level;
     Object.values(themes).forEach((elem, index) => {
       if (elem === this.level) {

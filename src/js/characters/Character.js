@@ -1,12 +1,11 @@
 export default class Character {
-  constructor(level, attack, defence, distance, distanceAttack, type) {
+  constructor(level, attack, defence, distance, distanceAttack) {
     this._level = level;
     this._health = 50;
     this._attack = Math.round(attack + (attack * (0.1 * (this._level - 1))));
     this._defence = Math.round(defence + (defence * (0.1 * (this._level - 1))));
     this._distance = distance;
     this._distanceAttack = distanceAttack;
-    this._type = type;
     // TODO: throw error if user use "new Character()"
     if (new.target.name === 'Character') throw new Error('class Character cannot be instantiated');
   }
