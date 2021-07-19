@@ -51,6 +51,7 @@ export default class GameController {
   preparationGame() {
     this.humanTeam = generateTeam([this.teams.humansRepository[0], this.teams.humansRepository[1]], 1, 2);
     this.demonTeam = generateTeam(this.teams.demonsRepository, 2, 2);
+    this.move = this.humanTeam;
     this.saveInSession();
   }
 
